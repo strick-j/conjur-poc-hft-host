@@ -92,7 +92,7 @@ print_head "Step 1: Gathering system information"
     fi
   fi
   # Proceed to next function, pass on ci or cd
-  print_success "Directory structure verfied and system info gathered"
+  print_success "Directory structure verified and system info gathered"
   generate_hft $id
 }
 generate_hft(){
