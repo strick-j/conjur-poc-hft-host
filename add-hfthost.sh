@@ -100,9 +100,10 @@ generate_hft(){
   local append=$(date +%Y%m%d%H%M%S)
   local hostname=$(cat ~/.netrc | awk '/machine/ {print $2}')
   local hostname=${hostname%/authn}
+  local conjurCert=$(cat ~/.conjurrc | awk '/cert_file:/ {print $2}')
+  local conjurCert=$(sed -e 's/^"//' -e 's/"$//' <<<"$conjurCert")
   local api=$(cat ~/.netrc | grep password | awk '{print $2}')
   local account=$(cat ~/.conjurrc | grep account | awk '{print $2}')
-  local conjurCert="/root/conjur-cyberark.pem"
   local login=$(cat ~/.netrc | grep login | awk '{print $2}')
   print_info "Generating host factory token for apps/${1}"
   print_info "Using login = $login"
@@ -123,7 +124,8 @@ generate_identity(){
   local hftoken=$1
   local hostname=$(cat ~/.netrc | awk '/machine/ {print $2}')
   local hostname=${hostname%/authn}
-  local conjurCert="/root/conjur-cyberark.pem"
+  local conjurCert=$(cat ~/.conjurrc | awk '/cert_file:/ {print $2}')
+  local conjurCert=$(sed -e 's/^"//' -e 's/"$//' <<<"$conjurCert")
   local id="$hftoken-$(openssl rand -hex 2)"
   local token=$(cat hostfactoryTokens/"$2" | jq '.[0] | {token}' | awk '{print $2}' | tr -d '"\n\r')
   local newidentity=$(curl -X POST -s --cacert $conjurCert -H "Authorization: Token token=\"$token\"" --data-urlencode id=$id $hostname/host_factories/hosts)
@@ -137,6 +139,9 @@ generate_identity(){
 }
 pull_secret(){
   print_head "Step 4: Testing secret access based CI/CD choices"
+  local conjurCert=$(cat ~/.conjurrc | awk '/cert_file:/ {print $2}')
+  local conjurCert=$(sed -e 's/^"//' -e 's/"$//' <<<"$conjurCert")
+  local account=$(cat ~/.conjurrc | awk '/account:/ {print $2}')
   local hostname=$(cat ~/.netrc | awk '/machine/ {print $2}')
   local hostname=${hostname%/authn}
   local systemname=$(cat identity/${2}_identity | jq -r '.id' | awk -F: '{print $NF}')
@@ -145,14 +150,13 @@ pull_secret(){
   # Test access to CI Secret
   if [[ $1 == ci ]]; then
     print_info "Attempting to access CI Secret"
-    local conjurCert="/root/conjur-cyberark.pem"
     local secret_name="apps/secrets/ci-variables/chef_secret"
-    local auth=$(curl -s --cacert $conjurCert -H "Content-Type: text/plain" -X POST -d "${api_key}" $hostname/authn/cyberark/host%2F$systemname/authenticate)
     print_info "Pulling secret: $secret_name"
     print_info "Using Conjur system name: $2"
     print_info "Using API key: $api_key"
+    local auth=$(curl -s --cacert $conjurCert -H "Content-Type: text/plain" -X POST -d "${api_key}" $hostname/authn/$account/host%2F$systemname/authenticate)
     local auth_token=$(echo -n $auth | base64 | tr -d '\r\n')
-    local secret_retrieve=$(curl --cacert $conjurCert -s -X GET -H "Authorization: Token token=\"$auth_token\"" $hostname/secrets/cyberark/variable/$secret_name)
+    local secret_retrieve=$(curl --cacert $conjurCert -s -X GET -H "Authorization: Token token=\"$auth_token\"" $hostname/secrets/$account/variable/$secret_name)
     echo ""
     print_success "Secret is: $secret_retrieve"
     echo ""
@@ -164,9 +168,9 @@ pull_secret(){
     print_info "Pulling secret: $secret_name"
     print_info "Using Conjur system name: $2"
     print_info "Using API key: $api_key"
-    local auth=$(curl -s --cacert $conjurCert -H "Content-Type: text/plain" -X POST -d "${api_key}" $hostname/authn/cyberark/host%2F$systemname/authenticate)
+    local auth=$(curl -s --cacert $conjurCert -H "Content-Type: text/plain" -X POST -d "${api_key}" $hostname/authn/$account/host%2F$systemname/authenticate)
     local auth_token=$(echo -n $auth | base64 | tr -d '\r\n')
-    local secret_retrieve=$(curl --cacert $conjurCert -s -X GET -H "Authorization: Token token=\"$auth_token\"" $hostname/secrets/cyberark/variable/$secret_name)
+    local secret_retrieve=$(curl --cacert $conjurCert -s -X GET -H "Authorization: Token token=\"$auth_token\"" $hostname/secrets/$account/variable/$secret_name)
     echo ""
     print_success "Secret is: $secret_retrieve"
     echo ""
